@@ -141,3 +141,67 @@ para ninguém perder tempo pelo caminho errado.
    `evidencias/verificacao-N.txt`.
 4. Cada integrante recebe uma cópia por e-mail. **Guardem esse e-mail**: é o
    comprovante.
+
+---
+
+## Tabela de tokens (Entrega 1)
+
+A coluna do primeiro caractere de cada linha é **1**. O analisador em
+`mplc/lexico.py` percorre o fonte da esquerda para a direita, descarta
+espaços (` `, `\t`, `\r`, `\n`) e os dois tipos de comentário, e emite um
+token por casamento. Operadores de dois caracteres são tentados **antes**
+dos de um, para que `<=`, `>=`, `==` e `!=` não se partam. A lista termina
+sempre com `FIM_ARQUIVO` (lexema vazio): na linha seguinte, coluna 1, se o
+arquivo acaba em quebra de linha; senão, logo após o último caractere.
+
+| Tipo | O que reconhece | Expressão regular / regra |
+|---|---|---|
+| `INTEIRO` | literal inteiro | `[0-9]+` |
+| `REAL` | literal real (dígito dos dois lados do ponto) | `[0-9]+\.[0-9]+` |
+| `LOGICO` | literal lógico | `verdadeiro` \| `falso` |
+| `TEXTO` | literal entre aspas, numa linha só | `"` (`\\[nt"\\]` \| `[^"\\\n\r]`)* `"` |
+| `ID` | identificador (não reservado) | `[a-zA-Z_][a-zA-Z0-9_]*` |
+| `FUNCAO` | palavra reservada | `funcao` |
+| `RETORNE` | palavra reservada | `retorne` |
+| `SE` | palavra reservada | `se` |
+| `SENAO` | palavra reservada | `senao` |
+| `ENQUANTO` | palavra reservada | `enquanto` |
+| `ESCREVA` | palavra reservada | `escreva` |
+| `TIPO_INTEIRO` | nome de tipo | `inteiro` |
+| `TIPO_REAL` | nome de tipo | `real` |
+| `TIPO_LOGICO` | nome de tipo | `logico` |
+| `TIPO_TEXTO` | nome de tipo | `texto` |
+| `TIPO_VAZIO` | nome de tipo | `vazio` |
+| `E` | operador lógico | `e` |
+| `OU` | operador lógico | `ou` |
+| `NAO` | operador lógico | `nao` |
+| `MAIS` | operador | `+` |
+| `MENOS` | operador | `-` |
+| `VEZES` | operador | `*` |
+| `DIVIDE` | operador | `/` |
+| `RESTO` | operador | `%` |
+| `IGUAL` | operador | `==` |
+| `DIFERENTE` | operador | `!=` |
+| `MENOR` | operador | `<` |
+| `MENOR_IGUAL` | operador | `<=` |
+| `MAIOR` | operador | `>` |
+| `MAIOR_IGUAL` | operador | `>=` |
+| `ATRIBUI` | atribuição | `=` |
+| `ABRE_PAR` | delimitador | `(` |
+| `FECHA_PAR` | delimitador | `)` |
+| `ABRE_CHAVE` | delimitador | `{` |
+| `FECHA_CHAVE` | delimitador | `}` |
+| `VIRGULA` | delimitador | `,` |
+| `PONTO_VIRGULA` | delimitador | `;` |
+| `FIM_ARQUIVO` | fim do fonte | (lexema vazio) |
+
+Comentários não geram token: `//` até o fim da linha, e `/* ... */` de
+bloco (não aninha; o primeiro `*/` fecha). Bloco aberto sem `*/` é erro
+léxico na posição do `/*`.
+
+Erros léxicos, ancorados no caractere que estragou o token:
+
+- escape fora de `\n`, `\t`, `\"`, `\\` — na barra
+- texto sem fecha-aspas, ou quebrando a linha — na aspa de abertura
+- `3.` ou `.5` (ponto sem dígito de um dos lados) — no ponto
+- caractere que não começa nenhum token — nele mesmo
