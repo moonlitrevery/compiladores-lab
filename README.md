@@ -205,3 +205,63 @@ Erros léxicos, ancorados no caractere que estragou o token:
 - texto sem fecha-aspas, ou quebrando a linha — na aspa de abertura
 - `3.` ou `.5` (ponto sem dígito de um dos lados) — no ponto
 - caractere que não começa nenhum token — nele mesmo
+
+---
+
+## Gramática (Entrega 2)
+
+Gramática em EBNF implementada por descida recursiva em `mplc/sintatico.py`:
+cada não-terminal abaixo é uma função com o mesmo nome. Os terminais em
+maiúsculas são os tipos de token da tabela acima. `{ x }` significa zero ou
+mais repetições e `[ x ]` significa opcional.
+
+```ebnf
+programa       = { funcao } FIM_ARQUIVO ;
+funcao         = FUNCAO tipo_retorno ID parametros bloco ;
+parametros     = ABRE_PAR [ parametro { VIRGULA parametro } ] FECHA_PAR ;
+parametro      = tipo ID ;
+tipo           = TIPO_INTEIRO | TIPO_REAL | TIPO_LOGICO | TIPO_TEXTO ;
+tipo_retorno   = tipo | TIPO_VAZIO ;
+
+bloco          = ABRE_CHAVE { comando } FECHA_CHAVE ;
+comando        = declaracao | atribuicao | se | enquanto | escreva
+               | retorne | chamada PONTO_VIRGULA | bloco ;
+declaracao     = tipo ID [ ATRIBUI expressao ] PONTO_VIRGULA ;
+atribuicao     = ID ATRIBUI expressao PONTO_VIRGULA ;
+se             = SE condicao bloco [ SENAO bloco ] ;
+enquanto       = ENQUANTO condicao bloco ;
+condicao       = ABRE_PAR expressao FECHA_PAR ;
+escreva        = ESCREVA ABRE_PAR expressao FECHA_PAR PONTO_VIRGULA ;
+retorne        = RETORNE [ expressao ] PONTO_VIRGULA ;
+
+expressao      = ou ;
+ou             = e { OU e } ;
+e              = igualdade { E igualdade } ;
+igualdade      = relacional { ( IGUAL | DIFERENTE ) relacional } ;
+relacional     = aditivo { ( MENOR | MENOR_IGUAL | MAIOR | MAIOR_IGUAL ) aditivo } ;
+aditivo        = multiplicativo { ( MAIS | MENOS ) multiplicativo } ;
+multiplicativo = unario { ( VEZES | DIVIDE | RESTO ) unario } ;
+unario         = ( NAO | MENOS ) unario | primario ;
+primario       = INTEIRO | REAL | LOGICO | TEXTO
+               | chamada | ID
+               | ABRE_PAR expressao FECHA_PAR ;
+chamada        = ID ABRE_PAR [ expressao { VIRGULA expressao } ] FECHA_PAR ;
+```
+
+**Como a precedência está codificada:** há uma regra por nível da seção 3.3
+da especificação, do mais fraco (`ou`) para o mais forte (`primario`), e cada
+regra só se refere à regra do nível logo abaixo. Por isso um operador mais
+forte sempre fica mais fundo na árvore: em `1 + 2 * 3`, o `*` é consumido
+dentro de `multiplicativo` antes que `aditivo` monte o `+`. A associatividade
+à esquerda vem da repetição `{ op próximo }`, e não de recursão à direita. No
+parser ela é um laço que pendura a árvore montada até ali como filho
+**esquerdo** do novo operador, então `10 - 4 - 3` vira `(10 - 4) - 3`. Só
+`unario` chama a si mesmo, porque `nao` e o `-` unário associam à direita.
+
+Duas decisões que a gramática deixa explícitas:
+
+- Um comando que começa por `ID` é decidido olhando **um token à frente**:
+  `=` é atribuição, `(` é chamada usada como comando. Qualquer outro token
+  ali é erro sintático, relatado nesse token.
+- `vazio` só aparece em `tipo_retorno`. `vazio x;` e `funcao f(vazio x)` são
+  recusados já na sintaxe.
