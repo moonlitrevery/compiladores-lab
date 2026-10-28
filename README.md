@@ -265,3 +265,28 @@ Duas decisões que a gramática deixa explícitas:
   ali é erro sintático, relatado nesse token.
 - `vazio` só aparece em `tipo_retorno`. `vazio x;` e `funcao f(vazio x)` são
   recusados já na sintaxe.
+
+---
+
+## Escopos (Entrega 3)
+
+Os escopos são uma **árvore de dicionários encadeados** (`mplc/semantica.py`):
+cada `Escopo` tem um dicionário `nome → Simbolo` só com o que foi declarado
+nele e um ponteiro para o pai, e procurar um nome é subir pelos pais até
+achar. Isso dá o sombreamento de graça — o primeiro achado é o mais de
+dentro — e fechar um bloco é só voltar o escopo atual para o pai, o que faz a
+variável de fora reaparecer sem apagar nada. Não usamos uma pilha que
+descarta o escopo ao fechar porque o `--tabela` precisa de todos os escopos
+no fim, numerados na ordem em que abriram, e a Entrega 4 também vai
+precisar: a `Tabela` guarda essa lista, e o analisador pendura em cada uso de
+nome na árvore o `Simbolo` exato que ele resolveu. Assim, quando os nomes
+virarem posições de memória, cada `x` sombreado já é um objeto diferente e
+basta dar um endereço a cada `Simbolo`, sem refazer a busca por nome.
+
+O resto da análise, em duas passadas: a primeira põe as assinaturas de todas
+as funções no escopo 0, para que uma função possa chamar outra que aparece
+depois; a segunda percorre os corpos abrindo os escopos (parâmetros, bloco do
+corpo, e um por `se`, `senao`, `enquanto` e `{ }`) e conferindo os tipos. A
+garantia de retorno olha só a estrutura: `retorne` garante, um bloco garante
+se algum comando dele garante, `se/senao` garante se os dois lados garantem,
+e `se` sem `senao` e `enquanto` nunca garantem, qualquer que seja a condição.
