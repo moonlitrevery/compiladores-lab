@@ -290,3 +290,87 @@ corpo, e um por `se`, `senao`, `enquanto` e `{ }`) e conferindo os tipos. A
 garantia de retorno olha só a estrutura: `retorne` garante, um bloco garante
 se algum comando dele garante, `se/senao` garante se os dois lados garantem,
 e `se` sem `senao` e `enquanto` nunca garantem, qualquer que seja a condição.
+
+---
+
+## Código intermediário, geração e máquina virtual (Entrega 4)
+
+O caminho é `árvore anotada → três endereços (--ir) → .mplb → VM`.
+
+**Três endereços** (`mplc/intermediario.py`). Cada expressão devolve um
+operando (constante, variável ou temporário `tN`); um nó binário grava o
+resultado num temporário novo, então cada linha do `--ir` tem no máximo um
+operador. Cada `Simbolo` da Entrega 3 vira um nome único na função — os `x`
+sombreados viram `x`, `x.4`, `x.5` (o número é o do escopo; `.` não existe em
+identificador, então não colide). A conversão `inteiro → real` é uma linha
+explícita, `t1 = real t0`, posta só onde a semântica exige real. Por isso
+`real x = 7 / 2;` vira `t0 = 7 / 2` seguido de `t1 = real t0`: a divisão é
+entre inteiros e dá `3`, e só depois vira `3.000000`.
+
+**O `.mplb`** (`mplc/gerador.py`) é texto: o código de uma máquina de pilha.
+Cada variável, parâmetro e temporário ganha uma **posição** no registro de
+ativação, com os parâmetros primeiro. Formato:
+
+```
+.funcao <nome> <nº de parâmetros> <nº de posições>
+.local <posição> <nome>                    ; só documentação
+    <linha do fonte>  <INSTRUÇÃO> [argumento]   ; comentário
+<rótulo>:
+.fim
+```
+
+A linha do fonte em cada instrução é o que deixa a VM relatar o erro de
+execução na linha certa.
+
+**A VM** (`mplc/vm.py`) tem uma pilha de **registros de ativação**; cada um
+guarda as posições da chamada, a pilha de operandos dela e o `pc`. O ponto de
+volta é o `pc` do registro de quem chamou, que fica parado embaixo até o
+retorno. A VM não usa a recursão do Python: o laço é iterativo, e o estouro de
+pilha é a regra `LIMITE_CHAMADAS` (10000 chamadas aninhadas), relatado na
+linha da chamada com código de saída 2.
+
+### Conjunto de instruções
+
+Notação da pilha: `… a b → … r` quer dizer que `b` está no topo, os dois saem
+e `r` entra. A pilha é a do registro de ativação atual.
+
+| Instrução | Pilha | O que faz |
+|---|---|---|
+| `EMPILHA c` | `… → … c` | empilha a constante `c`: `42`, `2.5`, `verdadeiro`, `"oi\n"` |
+| `CARREGA p` | `… → … v` | empilha o valor da posição `p` do registro atual |
+| `GUARDA p` | `… v → …` | desempilha e grava na posição `p` |
+| `SOMA` | `… a b → … a+b` | soma números; com dois textos, concatena |
+| `SUBTRAI` | `… a b → … a-b` | subtração |
+| `MULTIPLICA` | `… a b → … a*b` | multiplicação |
+| `DIVIDE` | `… a b → … a/b` | dois inteiros: divisão inteira truncada para zero (`-7/2` é `-3`); senão, real. `b` zero é erro de execução |
+| `RESTO` | `… a b → … a%b` | resto com o sinal do dividendo (`-7%3` é `-1`), calculado como `a - b*(a/b)`. `b` zero é erro de execução |
+| `NEGA` | `… a → … -a` | menos unário |
+| `IGUAL` | `… a b → … a==b` | lógico |
+| `DIFERENTE` | `… a b → … a!=b` | lógico |
+| `MENOR` | `… a b → … a<b` | lógico |
+| `MENOR_IGUAL` | `… a b → … a<=b` | lógico |
+| `MAIOR` | `… a b → … a>b` | lógico |
+| `MAIOR_IGUAL` | `… a b → … a>=b` | lógico |
+| `E` | `… a b → … a e b` | os dois lados já foram avaliados (sem curto-circuito) |
+| `OU` | `… a b → … a ou b` | idem |
+| `NAO` | `… a → … nao a` | negação lógica |
+| `PARA_REAL` | `… i → … r` | converte inteiro em real (a única conversão implícita da MPL) |
+| `DESVIA L` | `… → …` | continua no rótulo `L` |
+| `DESVIA_SE_FALSO L` | `… c → …` | desempilha `c`; se for `falso`, continua em `L` |
+| `CHAMA f` | `… a1..an → …` | tira os `n` argumentos do topo e cria um registro de ativação novo para `f`, com eles nas posições `0..n-1`; empilha o registro e começa `f` do início |
+| `RETORNA_VALOR` | `… v → ` (chamador: `… → … v`) | desempilha `v`, descarta o registro atual e empilha `v` na pilha de quem chamou, que continua de onde parou |
+| `RETORNA` | `… → ` | descarta o registro atual e volta para quem chamou; no `principal`, encerra o programa |
+| `ESCREVA` | `… v → …` | desempilha e imprime no formato da seção 4.5 (real com 6 casas, `verdadeiro`/`falso`) |
+
+### O programa do grupo
+
+[`exemplos/hanoi.mpl`](exemplos/hanoi.mpl): como a MPL não converte número em
+texto, o programa escreve essa conversão na própria MPL (divisão inteira e
+resto, com recursão). Depois resolve a Torre de Hanói com 3 discos (recursão
+dupla), conta os movimentos para até 20 discos e calcula raízes quadradas
+pelo método de Newton. A saída esperada está em
+[`exemplos/hanoi.saida`](exemplos/hanoi.saida).
+
+```bash
+./compilar exemplos/hanoi.mpl && ./executar exemplos/hanoi.mplb
+```
